@@ -44,6 +44,7 @@
         logical :: axis_equal  = .false.     !! equal scale on each axis
         logical :: axisbelow   = .true.      !! axis below other chart elements
         logical :: tight_layout = .false.    !! tight layout option
+        logical :: dates = .false.           !! tight layout option
 
         character(len=:),allocatable :: real_fmt  !! real number formatting
 
@@ -53,6 +54,7 @@
         procedure, public :: initialize    !! initialize pyplot instance
 
         procedure, public :: add_plot      !! add a 2d plot to pyplot instance
+        procedure, public :: add_plot_date !! add a 2d plot date to pyplot instance
         procedure, public :: add_3d_plot   !! add a 3d plot to pyplot instance
         procedure, public :: add_sphere    !! add a 3d sphere to pyplot instance
         procedure, public :: add_contour   !! add a contour plot to pyplot instance
@@ -69,6 +71,12 @@
         procedure :: finish_ops !! some final ops before saving
 
     end type pyplot
+
+
+    interface vec_to_string
+      module procedure :: real_vec_to_string
+      module procedure :: char_vec_to_string
+    end interface
 
     contains
 !*****************************************************************************************
@@ -111,7 +119,7 @@
     subroutine initialize(me, grid, xlabel, ylabel, zlabel, title, legend, use_numpy, figsize, &
                           font_size, axes_labelsize, xtick_labelsize, ytick_labelsize, ztick_labelsize, &
                           legend_fontsize, mplot3d, axis_equal, polar, real_fmt, use_oo_api, axisbelow,&
-                          tight_layout)
+                          tight_layout,dates)
 
     class(pyplot),         intent(inout)        :: me              !! pyplot handler
     logical,               intent(in), optional :: grid            !! activate grid drawing
@@ -135,6 +143,7 @@
     logical,               intent(in), optional :: use_oo_api      !! avoid matplotlib's GUI by using the OO interface (cannot use with showfig)
     logical,               intent(in), optional :: axisbelow       !! to put the grid lines below the other chart elements [default is true]
     logical,               intent(in), optional :: tight_layout    !! enable tight layout [default is false]
+    logical,               intent(in), optional :: dates           !! enable dates [default is false]
 
     character(len=max_int_len)  :: width_str             !! figure width dummy string
     character(len=max_int_len)  :: height_str            !! figure height dummy string
@@ -194,6 +203,11 @@
     else
         me%tight_layout = .false.
     end if
+    if (present(dates)) then
+        me%dates = dates
+    else
+        me%dates = .false.
+    end if
 
     call optional_int_to_string(font_size, font_size_str, default_font_size_str)
     call optional_int_to_string(axes_labelsize, axes_labelsize_str, default_font_size_str)
@@ -215,6 +229,10 @@
         call me%add_str('import matplotlib.pyplot as plt')
     endif
     if (me%mplot3d) call me%add_str('from mpl_toolkits.mplot3d import Axes3D')
+    if (me%dates) then
+      call me%add_str('from datetime import datetime')
+      call me%add_str('import matplotlib.dates as dates')
+    end if
     if (me%use_numpy) call me%add_str('import numpy as np')
     call me%add_str('')
 
@@ -355,6 +373,98 @@
     end if
 
     end subroutine add_plot
+!*****************************************************************************************
+
+!*****************************************************************************************
+!> author: Miha Polajnar
+!
+! Add an x,y plot date.
+subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, linewidth, xlim, ylim, xscale, yscale, color, istat)
+
+    class(pyplot),          intent (inout)               :: me           !! pyplot handler
+    character(len=*), dimension(:), intent (in)          :: x            !! x values
+    real(wp), dimension(:), intent (in)                  :: y            !! y values
+    character(len=*),       intent (in)                  :: label        !! plot label
+    character(len=*),       intent (in)                  :: linestyle    !! style of the plot line
+    character(len=*),       intent(in)                   :: time_format  !! time format for processing
+    integer,                intent (in), optional        :: markersize   !! size of the plot markers
+    integer,                intent (in), optional        :: linewidth    !! width of the plot line
+    character(len=*),dimension(2), intent (in), optional :: xlim         !! x-axis range
+    real(wp),dimension(2),  intent (in), optional        :: ylim         !! y-axis range
+    character(len=*),       intent (in), optional        :: xscale       !! example: 'linear' (default), 'log'
+    character(len=*),       intent (in), optional        :: yscale       !! example: 'linear' (default), 'log'
+    real(wp),dimension(:),  intent (in), optional        :: color        !! RGB color tuple [0-1,0-1,0-1]
+    integer,                intent (out)                 :: istat        !! status output (0 means no problems)
+
+    character(len=:), allocatable :: arg_str      !! the arguments to pass to `plot`
+    character(len=:), allocatable :: xstr         !! x values stringified
+    character(len=:), allocatable :: ystr         !! y values stringified
+    character(len=:), allocatable :: xlimstr      !! xlim values stringified
+    character(len=:), allocatable :: ylimstr      !! ylim values stringified
+    character(len=:), allocatable :: color_str    !! color values stringified
+    character(len=max_int_len)    :: imark        !! actual markers size
+    character(len=max_int_len)    :: iline        !! actual line width
+    character(len=*), parameter   :: xname = 'x'  !! x variable name for script
+    character(len=*), parameter   :: yname = 'y'  !! y variable name for script
+
+    if (allocated(me%str)) then
+
+        istat = 0
+
+        !axis limits (optional):
+        !need to adjust to character input
+        !if (present(xlim)) call vec_to_string(xlim, me%real_fmt, xlimstr, me%use_numpy)
+        if (present(ylim)) call vec_to_string(ylim, me%real_fmt, ylimstr, me%use_numpy)
+
+        !convert the arrays to strings:
+        call vec_to_string(v=x, str=xstr, use_numpy=me%use_numpy, dtype='datetime64')
+        call vec_to_string(y, me%real_fmt, ystr, me%use_numpy)
+
+        !get optional inputs (if not present, set default value):
+        call optional_int_to_string(markersize, imark, '3')
+        call optional_int_to_string(linewidth, iline, '3')
+
+        !write the arrays:
+        call me%add_str(trim(xname)//' = '//xstr)
+        call me%add_str(trim(yname)//' = '//ystr)
+        call me%add_str('')
+        !main arguments for plot:
+        arg_str = trim(xname)//','//&
+                  trim(yname)//','//&
+                  '"'//trim(linestyle)//'",'//&
+                  'linewidth='//trim(adjustl(iline))//','//&
+                  'markersize='//trim(adjustl(imark))//','//&
+                  'label="'//trim(label)//'"'
+
+        ! optional arguments:
+        if (present(color)) then
+            if (size(color)<=3) then
+                call vec_to_string(color(1:3), '*', color_str, use_numpy=.false., is_tuple=.true.)
+                arg_str = arg_str//',color='//trim(color_str)
+            end if
+        end if
+
+        !write the plot statement:
+        call me%add_str('ax.plot_date('//arg_str//')')
+
+        !axis limits:
+        if (allocated(xlimstr)) call me%add_str('ax.set_xlim('//xlimstr//')')
+        if (allocated(ylimstr)) call me%add_str('ax.set_ylim('//ylimstr//')')
+
+        !axis scales:
+        if (present(xscale)) call me%add_str('ax.set_xscale("'//xscale//'")')
+        if (present(yscale)) call me%add_str('ax.set_yscale("'//yscale//'")')
+
+        call me%add_str('')
+
+        !
+
+    else
+        istat = -1
+        write(error_unit,'(A)') 'Error in add_plot: pyplot class not properly initialized.'
+    end if
+
+    end subroutine add_plot_date
 !*****************************************************************************************
 
 !*****************************************************************************************
@@ -917,14 +1027,18 @@
 !> author: Jacob Williams
 !
 ! Real vector to string.
+!
+!### History
+!  * modified: Miha Polajnar 12/8/2018
 
-    subroutine vec_to_string(v, fmt, str, use_numpy, is_tuple)
+    subroutine real_vec_to_string(v, fmt, str, use_numpy, is_tuple, dtype)
 
     real(wp), dimension(:),        intent(in)  :: v         !! real values
     character(len=*),              intent(in)  :: fmt       !! real format string
     character(len=:), allocatable, intent(out) :: str       !! real values stringified
     logical,                       intent(in)  :: use_numpy !! activate numpy python module usage
     logical,intent(in),optional                :: is_tuple  !! if true [default], use '()', if false use '[]'
+    character(len=*), intent(in), optional     :: dtype !! optional dtype for numpy array
 
     integer                     :: i         !! counter
     integer                     :: istat     !! IO status
@@ -964,12 +1078,72 @@
         str = str // ']'
     end if
 
-    !convert to numpy array if necessary:
-    if (use_numpy) str = 'np.array('//str//')'
+    !convert to numpy array if necessary, include dtype if present:
+    if (present(dtype)) then
+      tmp = ',dtype='//dtype
+    else
+      tmp = ''
+    end if
+    if (use_numpy) str = 'np.array('//str//trim(adjustl(tmp))//')'
 
-    end subroutine vec_to_string
+    end subroutine real_vec_to_string
 !*****************************************************************************************
 
+!*****************************************************************************************
+!> author: Miha Polajnar
+!
+! Character vector to string.
+    subroutine char_vec_to_string(v, str, use_numpy, is_tuple, dtype)
+
+    character(len=*), dimension(:), intent(in)  :: v         !! char values
+    character(len=:), allocatable,  intent(out) :: str       !! char values stringified
+    logical,                        intent(in)  :: use_numpy !! activate numpy python module usage
+    logical,intent(in),optional                 :: is_tuple  !! if true [default], use '()', if false use '[]'
+    character(len=*), intent(in), optional      :: dtype
+
+    integer                     :: i         !! counter
+    integer                     :: istat     !! IO status
+    character(len=max_real_len) :: tmp       !! dummy string
+    logical :: tuple
+
+    if (present(is_tuple)) then
+        tuple = is_tuple
+    else
+        tuple = .false.
+    end if
+
+    if (tuple) then
+        str = '('
+    else
+        str = '['
+    end if
+
+    do i=1, size(v)
+        write(tmp, *, iostat=istat) v(i)
+        if (istat/=0) then
+            write(error_unit,'(A)') 'Error in vec_to_string'
+            str = '****'
+            return
+        end if
+        str = str//trim(adjustl(tmp))
+        if (i<size(v)) str = str // ','
+    end do
+
+    if (tuple) then
+        str = str // ')'
+    else
+        str = str // ']'
+    end if
+
+    !convert to numpy array if necessary, include dtype if present:
+    if (present(dtype)) then
+      tmp = ',dtype='//dtype
+    else
+      tmp = ''
+    end if
+    if (use_numpy) str = 'np.array('//str//trim(adjustl(tmp))//')'
+
+    end subroutine char_vec_to_string
 !*****************************************************************************************
 !> author: Jacob Williams
 !

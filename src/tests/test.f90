@@ -14,20 +14,22 @@
 
     integer,parameter :: n = 100
 
-    real(wp), dimension(n)   :: x     !! x values
-    real(wp), dimension(n)   :: y     !! y values
-    real(wp), dimension(n)   :: yerr  !! error values for bar chart
-    real(wp), dimension(n)   :: sx    !! sin(x) values
-    real(wp), dimension(n)   :: cx    !! cos(x) values
-    real(wp), dimension(n)   :: zx    !!
-    real(wp), dimension(n)   :: tx    !! sin(x)*cos(x) values
-    real(wp), dimension(n,n) :: z     !! z matrix for contour plot
-    type(pyplot)             :: plt   !! pytplot handler
-    integer                  :: i     !! counter
-    integer                  :: j     !! counter
-    real(wp)                 :: r2    !! temp variable
-    real(wp), dimension(n,n) :: mat   !! image values
-    integer                  :: istat !! status code
+    real(wp), dimension(n)       :: x     !! x values
+    character(len=19), dimension(n) :: x_dates ! x date values
+    real(wp), dimension(n)       :: y     !! y values
+    real(wp), dimension(n)       :: yerr  !! error values for bar chart
+    real(wp), dimension(n)       :: sx    !! sin(x) values
+    real(wp), dimension(n)       :: cx    !! cos(x) values
+    real(wp), dimension(n)       :: zx    !!
+    real(wp), dimension(n)       :: tx    !! sin(x)*cos(x) values
+    real(wp), dimension(n,n)     :: z     !! z matrix for contour plot
+    type(pyplot)                 :: plt   !! pytplot handler
+    integer                      :: i     !! counter
+    integer                      :: j     !! counter
+    real(wp)                     :: r2    !! temp variable
+    real(wp), dimension(n,n)     :: mat   !! image values
+    integer                      :: istat !! status code
+    character(len=2)             :: hour, minute
 
     real(wp),parameter :: pi = acos(-1.0_wp)
     real(wp),parameter :: deg2rad = pi/180.0_wp
@@ -54,6 +56,18 @@
     call plt%add_plot(x,cx,label='$\cos (x)$',linestyle='r-o',markersize=5,linewidth=2,istat=istat)
     call plt%add_plot(x,tx,label='$\sin (x) \cos (x)$',linestyle='g-o',markersize=2,linewidth=1,istat=istat)
     call plt%savefig('plottest.png', pyfile='plottest.py',istat=istat)
+
+    !2d line plot date
+    do i=1,n
+      write(hour,'(i2.2)') mod(i/60,24)
+      write(minute,'(i2.2)') mod(i,60)
+      x_dates(i) = '2018-05-05 '//hour//':'//minute//':00'
+    end do
+    call plt%initialize(grid=.true.,xlabel='angle (rad)',figsize=[20,10],&
+                        title='plot test',legend=.true.,axis_equal=.true.,&
+                        tight_layout=.true.,dates=.true.)
+    call plt%add_plot_date(x_dates)
+
 
     !bar chart:
     tx = 0.1_wp !for bar width
