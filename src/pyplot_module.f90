@@ -119,7 +119,7 @@
     subroutine initialize(me, grid, xlabel, ylabel, zlabel, title, legend, use_numpy, figsize, &
                           font_size, axes_labelsize, xtick_labelsize, ytick_labelsize, ztick_labelsize, &
                           legend_fontsize, mplot3d, axis_equal, polar, real_fmt, use_oo_api, axisbelow,&
-                          tight_layout,dates)
+                          tight_layout,dates,xaxis_time_format,xaxis_hour_interval)
 
     class(pyplot),         intent(inout)        :: me              !! pyplot handler
     logical,               intent(in), optional :: grid            !! activate grid drawing
@@ -144,6 +144,8 @@
     logical,               intent(in), optional :: axisbelow       !! to put the grid lines below the other chart elements [default is true]
     logical,               intent(in), optional :: tight_layout    !! enable tight layout [default is false]
     logical,               intent(in), optional :: dates           !! enable dates [default is false]
+    character(len=*),      intent(in), optional :: xaxis_time_format  !! xaxis time format
+    integer,               intent(in), optional :: xaxis_hour_interval !! xaxis hour inteval
 
     character(len=max_int_len)  :: width_str             !! figure width dummy string
     character(len=max_int_len)  :: height_str            !! figure height dummy string
@@ -153,6 +155,7 @@
     character(len=max_int_len)  :: ytick_labelsize_str   !! size of x axis tick labels dummy string
     character(len=max_int_len)  :: ztick_labelsize_str   !! size of z axis tick labels dummy string
     character(len=max_int_len)  :: legend_fontsize_str   !! size of legend font dummy string
+    character(len=max_int_len)  :: xaxis_interval_str    !! xaxis interval string
     character(len=:),allocatable :: python_fig_func      !! Python's function for creating a new Figure instance
 
     character(len=*), parameter :: default_font_size_str = '10' !! the default font size for plots
@@ -280,6 +283,15 @@
     if (present(zlabel)) call me%add_str('ax.set_zlabel("'//trim(zlabel)//'")')
     if (present(title))  call me%add_str('ax.set_title("' //trim(title) //'")')
 
+    !xaxis time format
+    if (present(xaxis_time_format).and.me%dates) call me%add_str(&
+      'ax.xaxis.set_major_formatter(dates.DateFormatter("'//xaxis_time_format//'"))')
+    !xaxis add hour interval
+    if (present(xaxis_hour_interval).and.me%dates) then
+      call integer_to_string(xaxis_hour_interval,xaxis_interval_str)
+      call me%add_str('ax.xaxis.set_major_locator(dates.HourLocator(interval='&
+        //trim(xaxis_interval_str)//'))')
+    end if
     call me%add_str('')
 
     end subroutine initialize
@@ -379,22 +391,22 @@
 !> author: Miha Polajnar
 !
 ! Add an x,y plot date.
-subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, linewidth, xlim, ylim, xscale, yscale, color, istat)
+subroutine add_plot_date(me, x, y, label, linestyle, markersize, &
+  linewidth, xlim, ylim, xscale, yscale, color, istat)
 
-    class(pyplot),          intent (inout)               :: me           !! pyplot handler
-    character(len=*), dimension(:), intent (in)          :: x            !! x values
-    real(wp), dimension(:), intent (in)                  :: y            !! y values
-    character(len=*),       intent (in)                  :: label        !! plot label
-    character(len=*),       intent (in)                  :: linestyle    !! style of the plot line
-    character(len=*),       intent(in)                   :: time_format  !! time format for processing
-    integer,                intent (in), optional        :: markersize   !! size of the plot markers
-    integer,                intent (in), optional        :: linewidth    !! width of the plot line
-    character(len=*),dimension(2), intent (in), optional :: xlim         !! x-axis range
-    real(wp),dimension(2),  intent (in), optional        :: ylim         !! y-axis range
-    character(len=*),       intent (in), optional        :: xscale       !! example: 'linear' (default), 'log'
-    character(len=*),       intent (in), optional        :: yscale       !! example: 'linear' (default), 'log'
-    real(wp),dimension(:),  intent (in), optional        :: color        !! RGB color tuple [0-1,0-1,0-1]
-    integer,                intent (out)                 :: istat        !! status output (0 means no problems)
+    class(pyplot),          intent (inout)               :: me                 !! pyplot handler
+    character(len=*), dimension(:), intent (in)          :: x                  !! x values
+    real(wp), dimension(:), intent (in)                  :: y                  !! y values
+    character(len=*),       intent (in)                  :: label              !! plot label
+    character(len=*),       intent (in)                  :: linestyle          !! style of the plot line
+    integer,                intent (in), optional        :: markersize         !! size of the plot markers
+    integer,                intent (in), optional        :: linewidth          !! width of the plot line
+    character(len=*),dimension(2), intent (in), optional :: xlim               !! x-axis range
+    real(wp),dimension(2),  intent (in), optional        :: ylim               !! y-axis range
+    character(len=*),       intent (in), optional        :: xscale             !! example: 'linear' (default), 'log'
+    character(len=*),       intent (in), optional        :: yscale             !! example: 'linear' (default), 'log'
+    real(wp),dimension(:),  intent (in), optional        :: color              !! RGB color tuple [0-1,0-1,0-1]
+    integer,                intent (out)                 :: istat              !! status output (0 means no problems)
 
     character(len=:), allocatable :: arg_str      !! the arguments to pass to `plot`
     character(len=:), allocatable :: xstr         !! x values stringified
@@ -425,7 +437,7 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
         call optional_int_to_string(linewidth, iline, '3')
 
         !write the arrays:
-        call me%add_str(trim(xname)//' = '//xstr)
+        call me%add_str(trim(xname)//' = '//xstr//'.astype(datetime)')
         call me%add_str(trim(yname)//' = '//ystr)
         call me%add_str('')
         !main arguments for plot:
@@ -456,8 +468,6 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
         if (present(yscale)) call me%add_str('ax.set_yscale("'//yscale//'")')
 
         call me%add_str('')
-
-        !
 
     else
         istat = -1
@@ -1080,7 +1090,7 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
 
     !convert to numpy array if necessary, include dtype if present:
     if (present(dtype)) then
-      tmp = ',dtype='//dtype
+      tmp = ',dtype="'//dtype//'"'
     else
       tmp = ''
     end if
@@ -1119,7 +1129,7 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
     end if
 
     do i=1, size(v)
-        write(tmp, *, iostat=istat) v(i)
+        write(tmp, *, iostat=istat) '"', v(i), '"'
         if (istat/=0) then
             write(error_unit,'(A)') 'Error in vec_to_string'
             str = '****'
@@ -1137,7 +1147,7 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
 
     !convert to numpy array if necessary, include dtype if present:
     if (present(dtype)) then
-      tmp = ',dtype='//dtype
+      tmp = ',dtype="'//dtype//'"'
     else
       tmp = ''
     end if
@@ -1252,6 +1262,8 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
 !> author: Jacob Williams
 !
 ! Some final things to add before saving or showing the figure.
+!### History
+!  * modified: Miha Polajnar 15/08/2018
 
     subroutine finish_ops(me)
 
@@ -1289,6 +1301,10 @@ subroutine add_plot_date(me, x, y, label, linestyle, time_format, markersize, li
     end if
     if (me%tight_layout) then
         call me%add_str('fig.tight_layout()')
+        call me%add_str('')
+    end if
+    if ( me%dates ) then
+        call me%add_str('fig.autofmt_xdate()')
         call me%add_str('')
     end if
 

@@ -59,15 +59,24 @@
 
     !2d line plot date
     do i=1,n
-      write(hour,'(i2.2)') mod(i/60,24)
+      write(hour,'(i2.2)') mod(i/6,24)
       write(minute,'(i2.2)') mod(i,60)
       x_dates(i) = '2018-05-05 '//hour//':'//minute//':00'
     end do
-    call plt%initialize(grid=.true.,xlabel='angle (rad)',figsize=[20,10],&
-                        title='plot test',legend=.true.,axis_equal=.true.,&
-                        tight_layout=.true.,dates=.true.)
-    call plt%add_plot_date(x_dates)
-
+    call plt%initialize(grid=.true.,xlabel='time',figsize=[20,10],&
+                        title='plot test',legend=.true.,axis_equal=.false.,&
+                        tight_layout=.true.,dates=.true.,xaxis_time_format='%d %H:%M',&
+                        xaxis_hour_interval=1)
+    call random_number(y)
+    call plt%add_plot_date(x_dates,y,label='random 1',linestyle='b-o',&
+      markersize=5,istat=istat)
+    call random_number(y)
+    call plt%add_plot_date(x_dates,y,label='random 2',linestyle='r-o',&
+      markersize=5,istat=istat)
+    call random_number(y)
+    call plt%add_plot_date(x_dates,y,label='random 3',linestyle='g-o',&
+      markersize=5,istat=istat)
+    call plt%savefig('plotdatetest.png', pyfile='plotdatetest.py',istat=istat)
 
     !bar chart:
     tx = 0.1_wp !for bar width
