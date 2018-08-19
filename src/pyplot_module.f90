@@ -27,6 +27,7 @@
     integer, parameter          :: max_int_len      = 10         !! max string length for integers
     character(len=*), parameter :: real_fmt_default = '(E30.16)' !! default real number format string
     integer, parameter          :: max_real_len     = 30         !! max string length for reals
+    integer, parameter          :: max_char_len     = 256        !! max string length for characters
 
     type, public :: pyplot
 
@@ -1039,7 +1040,7 @@ subroutine add_plot_date(me, x, y, label, linestyle, markersize, &
 ! Real vector to string.
 !
 !### History
-!  * modified: Miha Polajnar 12/8/2018
+!  * modified: Miha Polajnar 12/8/2018 (not an elegant solution, fix it)
 
     subroutine real_vec_to_string(v, fmt, str, use_numpy, is_tuple, dtype)
 
@@ -1050,9 +1051,11 @@ subroutine add_plot_date(me, x, y, label, linestyle, markersize, &
     logical,intent(in),optional                :: is_tuple  !! if true [default], use '()', if false use '[]'
     character(len=*), intent(in), optional     :: dtype !! optional dtype for numpy array
 
-    integer                     :: i         !! counter
+    integer                     :: i, j      !! counters
     integer                     :: istat     !! IO status
-    character(len=max_real_len) :: tmp       !! dummy string
+    integer                     :: tot_len   !! Total string length
+    integer                     :: arr_len, v_len
+    character(len=max_char_len) :: tmp       !! dummy string
     logical :: tuple
 
     if (present(is_tuple)) then
@@ -1061,31 +1064,48 @@ subroutine add_plot_date(me, x, y, label, linestyle, markersize, &
         tuple = .false.
     end if
 
-    if (tuple) then
-        str = '('
-    else
-        str = '['
-    end if
+    arr_len = 3 + max_real_len
+    tot_len = 4 + size(v) * arr_len
 
+    allocate(character(len=tot_len)::str)
+
+    if (tuple) then
+        str(1:2) = '(' // char(10)
+    else
+        str(1:2) = '[' // char(10)
+    end if
+    j=3
     do i=1, size(v)
-        if (fmt=='*') then
-            write(tmp, *, iostat=istat) v(i)
+        if ( mod(i,3) == 0 ) then
+          if (fmt=='*') then
+              write(tmp, *, iostat=istat) v(i)
+              tmp = " " // trim(tmp) // ',' // char(10)
+          else
+              write(tmp, fmt, iostat=istat) v(i)
+              tmp = " " //  trim(tmp) // ','// char(10)
+          end if
         else
-            write(tmp, fmt, iostat=istat) v(i)
+          if (fmt=='*') then
+              write(tmp, *, iostat=istat) v(i)
+              tmp = " " //  trim(tmp) // ','
+          else
+              write(tmp, fmt, iostat=istat) v(i)
+              tmp = " " //  trim(tmp) // ','
+          end if
         end if
         if (istat/=0) then
             write(error_unit,'(A)') 'Error in vec_to_string'
             str = '****'
             return
         end if
-        str = str//trim(adjustl(tmp))
-        if (i<size(v)) str = str // ','
+        str(j:j+arr_len) = tmp(1:arr_len)
+        j = j + arr_len
     end do
 
     if (tuple) then
-        str = str // ')'
+        str(tot_len-1:tot_len) = ')'
     else
-        str = str // ']'
+        str(tot_len-1:tot_len) = ']'
     end if
 
     !convert to numpy array if necessary, include dtype if present:
@@ -1111,38 +1131,49 @@ subroutine add_plot_date(me, x, y, label, linestyle, markersize, &
     logical,intent(in),optional                 :: is_tuple  !! if true [default], use '()', if false use '[]'
     character(len=*), intent(in), optional      :: dtype
 
-    integer                     :: i         !! counter
+    integer                     :: i, j      !! counters
     integer                     :: istat     !! IO status
-    character(len=max_real_len) :: tmp       !! dummy string
+    integer                     :: tot_len   !! Total string length
+    integer                     :: arr_len, v_len
+    character(len=max_char_len) :: tmp       !! dummy string
     logical :: tuple
+
 
     if (present(is_tuple)) then
         tuple = is_tuple
     else
         tuple = .false.
     end if
+    arr_len = 7 + len(v)
+    tot_len = 4 + size(v) * arr_len
+
+    allocate(character(len=tot_len)::str)
 
     if (tuple) then
-        str = '('
+        str(1:2) = '(' // char(10)
     else
-        str = '['
+        str(1:2) = '[' // char(10)
     end if
-
+    j=3
     do i=1, size(v)
-        write(tmp, *, iostat=istat) '"', v(i), '"'
+        if ( mod(i,3) == 0 ) then
+          write(tmp, *, iostat=istat) '  "', v(i), '",', char(10)
+        else
+          write(tmp, *, iostat=istat) '  "', v(i), '",'
+        end if
         if (istat/=0) then
             write(error_unit,'(A)') 'Error in vec_to_string'
             str = '****'
             return
         end if
-        str = str//trim(adjustl(tmp))
-        if (i<size(v)) str = str // ','
+        str(j:j+arr_len) = tmp(1:arr_len)
+        j = j + arr_len
     end do
 
     if (tuple) then
-        str = str // ')'
+        str(tot_len-1:tot_len) = ')'
     else
-        str = str // ']'
+        str(tot_len-1:tot_len) = ']'
     end if
 
     !convert to numpy array if necessary, include dtype if present:
