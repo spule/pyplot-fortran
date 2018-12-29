@@ -46,10 +46,9 @@
         logical :: axisbelow   = .true.      !! axis below other chart elements
         logical :: tight_layout = .false.    !! tight layout option
         logical :: dates = .false.           !! tight layout option
+        character(len=max_int_len) :: xticks_rotation_str = '45'    !! xticks rotation string
 
         character(len=:),allocatable :: real_fmt  !! real number formatting
-
-        character(len=max_int_len)  :: xticks_rotation_str = '45'    !! xticks rotation string
 
     contains
 
