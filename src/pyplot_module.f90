@@ -49,6 +49,8 @@
 
         character(len=:),allocatable :: real_fmt  !! real number formatting
 
+        character(len=max_int_len)  :: xticks_rotation_str = '45'    !! xticks rotation string
+
     contains
 
         ! public methods
@@ -120,7 +122,7 @@
     subroutine initialize(me, grid, xlabel, ylabel, zlabel, title, legend, use_numpy, figsize, &
                           font_size, axes_labelsize, xtick_labelsize, ytick_labelsize, ztick_labelsize, &
                           legend_fontsize, mplot3d, axis_equal, polar, real_fmt, use_oo_api, axisbelow,&
-                          tight_layout,dates,xaxis_time_format,xaxis_hour_interval)
+                          tight_layout,dates,xaxis_time_format,xaxis_hour_interval,xticks_rotation)
 
     class(pyplot),         intent(inout)        :: me              !! pyplot handler
     logical,               intent(in), optional :: grid            !! activate grid drawing
@@ -147,6 +149,7 @@
     logical,               intent(in), optional :: dates           !! enable dates [default is false]
     character(len=*),      intent(in), optional :: xaxis_time_format  !! xaxis time format
     integer,               intent(in), optional :: xaxis_hour_interval !! xaxis hour inteval
+    integer,               intent(in), optional :: xticks_rotation !! xticks rotation
 
     character(len=max_int_len)  :: width_str             !! figure width dummy string
     character(len=max_int_len)  :: height_str            !! figure height dummy string
@@ -157,6 +160,7 @@
     character(len=max_int_len)  :: ztick_labelsize_str   !! size of z axis tick labels dummy string
     character(len=max_int_len)  :: legend_fontsize_str   !! size of legend font dummy string
     character(len=max_int_len)  :: xaxis_interval_str    !! xaxis interval string
+
     character(len=:),allocatable :: python_fig_func      !! Python's function for creating a new Figure instance
 
     character(len=*), parameter :: default_font_size_str = '10' !! the default font size for plots
@@ -222,7 +226,7 @@
 
     me%str = ''
 
-    call me%add_str('#!/usr/bin/env python')
+    call me%add_str('#!/usr/bin/env '//python_exe)
     call me%add_str('')
 
     call me%add_str('import matplotlib')
@@ -292,6 +296,10 @@
       call integer_to_string(xaxis_hour_interval,xaxis_interval_str)
       call me%add_str('ax.xaxis.set_major_locator(dates.HourLocator(interval='&
         //trim(xaxis_interval_str)//'))')
+    end if
+    !xticks ad rotation
+    if (present(xticks_rotation).and.me%dates) then
+      call integer_to_string(xticks_rotation,me%xticks_rotation_str)
     end if
     call me%add_str('')
 
@@ -1334,8 +1342,13 @@ subroutine add_plot_date(me, x, y, label, linestyle, markersize, &
         call me%add_str('fig.tight_layout()')
         call me%add_str('')
     end if
+    ! Date related
     if ( me%dates ) then
         call me%add_str('fig.autofmt_xdate()')
+        call me%add_str('')
+    end if
+    if ( me%dates ) then
+        call me%add_str('plt.xticks(rotation='//trim(me%xticks_rotation_str)//')')
         call me%add_str('')
     end if
 
